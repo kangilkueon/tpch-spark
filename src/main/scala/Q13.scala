@@ -1,4 +1,4 @@
-package main.scala
+package tpch
 
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._

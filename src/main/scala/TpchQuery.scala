@@ -1,4 +1,4 @@
-package main.scala
+package tpch
 
 import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.mutable.ListBuffer
@@ -50,7 +50,7 @@ object TpchQuery {
     val executionTimes = new ListBuffer[(String, Float)]
     for (queryNo <- queryFrom to queryTo) {
       val startTime = System.nanoTime()
-      val query_name = f"main.scala.Q${queryNo}%02d"
+      val query_name = f"tpch.Q${queryNo}%02d"
 
       val log = LogManager.getRootLogger
 
@@ -76,14 +76,17 @@ object TpchQuery {
     // if no query is given, all queries 1..22 are run.
     if (args.length > 1)
       println("Expected at most 1 argument: query to run. No arguments = run all 22 queries.")
-    val queryNum = if (args.length == 1) {
+
+    val queryNum = if (args.length == 2) {
       try {
-        Some(Integer.parseInt(args(0).trim))
+        Some(Integer.parseInt(args(1).trim))
       } catch {
         case e: Exception => None
       }
     } else
       None
+
+    val useCSDOffload = args(0).toBoolean
 
     // get paths from env variables else use default
     val cwd = System.getProperty("user.dir")
@@ -95,7 +98,8 @@ object TpchQuery {
       .builder
       .appName("TPC-H v3.0.0 Spark")
       .getOrCreate()
-    val schemaProvider = new TpchSchemaProvider(spark, inputDataDir)
+    val schemaProvider = new TpchSchemaProvider(spark, inputDataDir, useCSDOffload)
+
 
     // execute queries
     val executionTimes = executeQueries(spark, schemaProvider, queryNum, queryOutputDir)
