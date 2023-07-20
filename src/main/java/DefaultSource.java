@@ -42,6 +42,8 @@ import java.nio.ByteOrder;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.nio.charset.Charset;
+
 import java.util.*;
 
 public class DefaultSource  implements TableProvider {
@@ -271,44 +273,156 @@ class CSDVirtPartitionReader implements PartitionReader<InternalRow> {
         } */
 
         // System.out.println("==================== CSDVIRT next ====================");
-        int size = 1 * 1024 * 1024;
+        Instant io_start = Instant.now();
+        int size = 16 * 1024 * 1024;
         ByteBuffer output_buffer = ByteBuffer.allocateDirect(size).order(ByteOrder.LITTLE_ENDIAN);
         int remain_size = Native.csdvirt_next_batch(csdvirtReaderPtr_, output_buffer, size);
+        // System.out.println("IO Time (us) : " + Duration.between(io_start, Instant.now()).toNanos() / 1000);
         // System.out.println("remain_size:" + remain_size);
-
+        
+        Instant decode_start = Instant.now();
         // System.out.println("##: " + stringBuffer.toString());
+
+        /* Best Policy         
+        Charset charset = Charset.forName("UTF-8");
+        String result = stringBuffer.toString() + charset.decode(output_buffer).toString();
+        */
+
+        /*
         while (size > 0) {
             stringBuffer.append((char) output_buffer.get());
             size--;
         }
         String result = stringBuffer.toString();
+        */
+
+        //String result = StandardCharsets.UTF_8.decode(output_buffer).toString();
+        // String result = stringBuffer.toString();
+        // System.out.println("Decode Time (us) : " + Duration.between(decode_start, Instant.now()).toNanos() / 1000);
+
+        Instant parsing_start = Instant.now();
+        /* Best Policy  
         String[] lines = result.split("\\r?\\n");
-    
-        stringBuffer.delete(0, stringBuffer.length());    
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i];
-            String[] items = line.split("\\|");
-            if (i == lines.length - 1) {
-                // System.out.println("== Last Row ==" + i);
-                // System.out.println(line);
-                stringBuffer.append(line);
-                // System.out.println("@@: " + stringBuffer.toString());
-                break;
+        */
+
+        
+        List<String> temp = new ArrayList<String>();
+        StringBuilder sb = new StringBuilder(stringBuffer.length() + size);
+        sb.setLength(0);
+        // sb.append(stringBuffer.toString());
+
+        Object[] temp_obj = new Object[num_rows];
+        boolean aligned_string = false;
+        int idx = 0;
+        int line_num = 0;
+
+        if (stringBuffer.length() > 0) {
+            String[] items = stringBuffer.toString().split("\\|");
+            // System.out.println("### : " + stringBuffer.toString());
+            //System.out.println("### : " + sb.toString());
+            // System.out.println("###### : " + stringBuffer.length() + "###" + items.length);
+            for (idx = 0; idx < items.length; idx++) {
+                temp_obj[idx] = valueConverters.get(idx).apply(items[idx]);
             }
+
+            if (stringBuffer.charAt(stringBuffer.length() - 1) == '|') {
+                // System.out.println("## aligned work! : " + stringBuffer.toString());
+            } else {
+                sb.append(items[items.length - 1]);
+                idx--;
+            }
+        }
+        //System.out.println("### : " + stringBuffer.toString());
+        //System.out.println("### : " + sb.toString());
+
+        stringBuffer.delete(0, stringBuffer.length());
+        while (size > 0) {
+            size--;
+
+            char c = (char) output_buffer.get();
+
+            if (c == '\n') {
+                // line split
+                if (size == 0) {
+                    aligned_string = true;
+                }
+                // temp.add(sb.toString());
+
+
+                if (num_rows != idx) {
+                    System.out.println("== row number do not match! ==" + idx + " line length: " + line_num);
+                    // System.out.println(lines[i]);
+                    continue;
+                }
+                rows.add(InternalRow.apply(JavaConverters.asScalaIteratorConverter(Arrays.asList(temp_obj).iterator()).asScala().toSeq()));
+                idx = 0;
+                line_num++;
+            } else if (c == '|') {
+                // token split
+                // System.out.println(idx + " value : " + sb.toString());
+                temp_obj[idx] = valueConverters.get(idx).apply(sb.toString());
+                sb.setLength(0);
+                idx++;
+            } else if (c == '\u0000') {
+                // System.out.println("Got you!");
+                break;
+            } else {
+                // default
+                sb.append(c);
+            }
+        }
+
+        if (idx > 0) {
+            for (int i = 0; i < idx; i++) {
+                stringBuffer.append(temp_obj[i].toString());
+                stringBuffer.append('|');
+            }
+        }
+        // System.out.println("stringBuffer line : " + stringBuffer.toString() + " size : " + stringBuffer.length() + " idx: " + idx);
+        // System.out.println("sb line : " + sb.toString() + " size : " + sb.length());
+
+        if (sb.length() > 0) {
+            stringBuffer.append(sb.toString());
+            sb.setLength(0);
+        }
+        // System.out.println("remain line : " + stringBuffer.toString() + " size : " + stringBuffer.length());
+        // System.out.println("line split Time (us) : " + Duration.between(parsing_start, Instant.now()).toNanos() / 1000);
+
+        /*
+        String[] lines = temp.toArray(new String[0]);
+    
+        parsing_start = Instant.now();
+        long split_time = 0;
+        long convert_time = 0;
+        long rowadd_time = 0;
+        for (int i = 0; i < lines.length; i++) {
+            Instant split_start = Instant.now();
+            // String line = lines[i];
+            String[] items = lines[i].split("\\|");
 
             if (num_rows != items.length) {
                 System.out.println("== row number do not match! ==" + i + " line length: " + lines.length);
-                System.out.println(line);
+                System.out.println(lines[i]);
                 continue;
             }
+            split_time += Duration.between(split_start, Instant.now()).toNanos();
 
+            Instant convert_start = Instant.now();
             Object[] temp_obj = new Object[items.length];
             for (int j = 0; j < items.length; j++) {
                 temp_obj[j] = valueConverters.get(j).apply(items[j]);
             }
+            convert_time += Duration.between(convert_start, Instant.now()).toNanos();
+            
+            Instant rowadd_start = Instant.now();
             rows.add(InternalRow.apply(JavaConverters.asScalaIteratorConverter(Arrays.asList(temp_obj).iterator()).asScala().toSeq()));
+            rowadd_time += Duration.between(rowadd_start, Instant.now()).toNanos();
         }
-
+        System.out.println("Parsing Time (us) : " + Duration.between(parsing_start, Instant.now()).toNanos() / 1000);
+        System.out.println("  split_time Time (us) : " + split_time/ 1000);
+        System.out.println("  convert_start Time (us) : " + convert_time/ 1000);
+        System.out.println("  rowadd_start Time (us) : " + rowadd_time/ 1000);
+        */
         if (rows.isEmpty()) {// && remain_size == 0) {
             return false;
         }
