@@ -21,5 +21,5 @@ pushd ../
 export PATH=$PATH:$PWD/spark-3.4.0-bin-hadoop3/bin
 popd
 
-#spark-submit --conf spark.default.parallelism=1 --conf spark.sql.files.maxPartitionBytes=1GB --num-executors 1 --executor-cores 1 --class "tpch.TpchQuery" target/scala-2.12/spark-tpc-h-queries_2.12-1.0.jar true $query
-spark-submit --class "tpch.TpchQuery" target/scala-2.12/spark-tpc-h-queries_2.12-1.0.jar true $query
+spark-submit --conf spark.default.parallelism=1 --conf spark.sql.files.maxPartitionBytes=1GB --num-executors 1 --executor-cores 1 --class "tpch.TpchQuery" target/scala-2.12/spark-tpc-h-queries_2.12-1.0.jar false $query
+#spark-submit --class "tpch.TpchQuery" target/scala-2.12/spark-tpc-h-queries_2.12-1.0.jar false $query

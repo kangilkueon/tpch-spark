@@ -92,8 +92,7 @@ class TpchSchemaProvider(spark: SparkSession, inputDir: String, useCSDOffload: B
       "customer" -> spark.read.textFile(inputDir + "/customer.tbl*").map(_.split('|')).map(p =>
         Customer(p(0).trim.toLong, p(1).trim, p(2).trim, p(3).trim.toLong, p(4).trim, p(5).trim.toDouble, p(6).trim, p(7).trim)).toDF(),
 
-
-      //"lineitem" -> spark.read.textFile("/mnt/test/hello").map(_.split('|')).map(p =>
+      // "lineitem" -> spark.read.textFile(inputDir + "/lineitem.tbl*").map(_.split('|')).map(p =>
       "lineitem" -> spark.read.textFile("/mnt/fuse/lineitem.tbl*").map(_.split('|')).map(p =>
         Lineitem(p(0).trim.toLong, p(1).trim.toLong, p(2).trim.toLong, p(3).trim.toLong, p(4).trim.toDouble, p(5).trim.toDouble, p(6).trim.toDouble, p(7).trim.toDouble, p(8).trim, p(9).trim, p(10).trim, p(11).trim, p(12).trim, p(13).trim, p(14).trim, p(15).trim)).toDF(),
 
@@ -114,8 +113,6 @@ class TpchSchemaProvider(spark: SparkSession, inputDir: String, useCSDOffload: B
 
       "supplier" -> spark.read.textFile(inputDir + "/supplier.tbl*").map(_.split('|')).map(p =>
         Supplier(p(0).trim.toLong, p(1).trim, p(2).trim, p(3).trim.toLong, p(4).trim, p(5).trim.toDouble, p(6).trim)).toDF()
-      
-      , "csdtest" -> spark.read.format("csdvirt").load(inputDir + "/lineitem")
     )
   } else {
     Map(
@@ -154,7 +151,6 @@ class TpchSchemaProvider(spark: SparkSession, inputDir: String, useCSDOffload: B
   val part = dfMap.get("part").get
   val partsupp = dfMap.get("partsupp").get
   val supplier = dfMap.get("supplier").get
-  val csdtest = dfMap.get("csdtest").get
 
   dfMap.foreach {
     case (key, value) => value.createOrReplaceTempView(key)
