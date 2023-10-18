@@ -82,7 +82,7 @@ case class Supplier(
   s_acctbal: Double,
   s_comment: String)
 
-class TpchSchemaProvider(spark: SparkSession, inputDir: String, useCSDOffload: Boolean) {
+class TpchSchemaProvider(spark: SparkSession, inputDir: String, csdDir: String, useCSDOffload: Boolean) {
   import spark.implicits._
 
 
@@ -93,7 +93,7 @@ class TpchSchemaProvider(spark: SparkSession, inputDir: String, useCSDOffload: B
         Customer(p(0).trim.toLong, p(1).trim, p(2).trim, p(3).trim.toLong, p(4).trim, p(5).trim.toDouble, p(6).trim, p(7).trim)).toDF(),
 
       // "lineitem" -> spark.read.textFile(inputDir + "/lineitem.tbl*").map(_.split('|')).map(p =>
-      "lineitem" -> spark.read.textFile("/mnt/fuse/lineitem.tbl*").map(_.split('|')).map(p =>
+      "lineitem" -> spark.read.textFile(csdDir + "/lineitem.tbl*").map(_.split('|')).map(p =>
         Lineitem(p(0).trim.toLong, p(1).trim.toLong, p(2).trim.toLong, p(3).trim.toLong, p(4).trim.toDouble, p(5).trim.toDouble, p(6).trim.toDouble, p(7).trim.toDouble, p(8).trim, p(9).trim, p(10).trim, p(11).trim, p(12).trim, p(13).trim, p(14).trim, p(15).trim)).toDF(),
 
       "nation" -> spark.read.textFile(inputDir + "/nation.tbl*").map(_.split('|')).map(p =>

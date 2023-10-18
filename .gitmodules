@@ -1,0 +1,3 @@
+[submodule "tools/csd_fuse"]
+	path = tools/csd_fuse
+	url = https://github.com/kangilkueon/csd_fuse.git
